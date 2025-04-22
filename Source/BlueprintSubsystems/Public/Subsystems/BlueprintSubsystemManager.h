@@ -34,7 +34,7 @@ protected:
 	* @brief Array of blueprint subsystems managed by this manager.
 	* @see UBlueprintsSubsystemDeveloperSettings
 	*/
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Details")
 	TArray<UBlueprintSubsystemBase*> BlueprintSubsystems;
 
 protected:
