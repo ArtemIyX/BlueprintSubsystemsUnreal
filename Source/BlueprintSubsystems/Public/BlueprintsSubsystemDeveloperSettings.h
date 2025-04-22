@@ -38,6 +38,6 @@ public:
 	* saved to the configuration file.
 	* @see UBlueprintSubsystemManager
 	*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Config, DisplayName="Subsystem List")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Config, DisplayName="Subsystem List", Category = "Details")
 	TArray<TSoftClassPtr<UBlueprintSubsystemBase>> ActiveSubsystems;
 };
