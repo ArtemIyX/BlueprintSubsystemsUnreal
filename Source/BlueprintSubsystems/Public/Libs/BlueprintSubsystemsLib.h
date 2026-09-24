@@ -29,8 +29,8 @@ public:
 	 * @param SubsystemClass The class type of the subsystem to retrieve.
 	 * @return A pointer to the UBlueprintSubsystemBase object of the requested class type.
 	 */
-	UFUNCTION(BlueprintCallable, BlueprintPure, meta=(DeterminesOutputType="SubsystemClass"), DisplayName="Get Subsystem", Category="BlueprintSubsystemsLib")
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta=(WorldContext="WorldContextObject", DeterminesOutputType="SubsystemClass"), DisplayName="Get Subsystem", Category="BlueprintSubsystemsLib")
 	static UBlueprintSubsystemBase* GetBlueprintSubsystem(
-		UGameInstance* InGameInstance,
+		const UObject* WorldContextObject,
 		TSubclassOf<UBlueprintSubsystemBase> SubsystemClass);
 };

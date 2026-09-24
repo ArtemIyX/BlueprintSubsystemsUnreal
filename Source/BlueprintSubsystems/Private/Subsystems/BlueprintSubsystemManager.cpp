@@ -3,7 +3,9 @@
 
 #include "Subsystems/BlueprintSubsystemManager.h"
 
+#include "BlueprintSubsystems.h"
 #include "BlueprintsSubsystemDeveloperSettings.h"
+#include "Engine/GameInstance.h"
 
 UBlueprintSubsystemManager::UBlueprintSubsystemManager()
 {
@@ -18,6 +20,7 @@ const UBlueprintsSubsystemDeveloperSettings* UBlueprintSubsystemManager::GetSett
 void UBlueprintSubsystemManager::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	bIsInitializing = true;
 	BlueprintSubsystems.Empty();
 	const UBlueprintsSubsystemDeveloperSettings* settings = GetSettings();
 	TArray<TSoftClassPtr<UBlueprintSubsystemBase>> classList = settings->ActiveSubsystems;
@@ -25,52 +28,94 @@ void UBlueprintSubsystemManager::Initialize(FSubsystemCollectionBase& Collection
 	BlueprintSubsystems.Reserve(classList.Num());
 	for (TSoftClassPtr<UBlueprintSubsystemBase> subsystemClassPtr : classList)
 	{
-		UClass* subsystemClass = subsystemClassPtr.LoadSynchronous();
-		if (IsValid(subsystemClass))
-		{
-			UBlueprintSubsystemBase* obj = NewObject<UBlueprintSubsystemBase>(this, subsystemClass);
-			if (IsValid(obj))
-			{
-				BlueprintSubsystems.Add(obj);
-			}
-		}
+		ActivateSubsystem(subsystemClassPtr.LoadSynchronous());
 	}
-	for (int32 i = 0; i < BlueprintSubsystems.Num(); ++i)
+	for (UBlueprintSubsystemBase* subsystem : BlueprintSubsystems)
 	{
-		UBlueprintSubsystemBase* subsystem = BlueprintSubsystems[i];
 		if (IsValid(subsystem))
 		{
 			subsystem->Initialize(BlueprintSubsystems);
 		}
 	}
+	bIsInitializing = false;
 }
 
 void UBlueprintSubsystemManager::Deinitialize()
 {
-	for (int32 i = 0; i < BlueprintSubsystems.Num(); ++i)
+	bIsInitializing = false;
+	const TArray<UBlueprintSubsystemBase*> subsystems = BlueprintSubsystems;
+	BlueprintSubsystems.Empty();
+	for (UBlueprintSubsystemBase* subsystem : subsystems)
 	{
-		if (IsValid(BlueprintSubsystems[i]))
+		if (IsValid(subsystem))
 		{
-			BlueprintSubsystems[i]->DeInitialize();
-			BlueprintSubsystems[i]->ConditionalBeginDestroy();
-			BlueprintSubsystems[i] = nullptr;
+			subsystem->DeInitialize();
 		}
 	}
-	BlueprintSubsystems.Empty();
 	Super::Deinitialize();
 }
 
 UBlueprintSubsystemBase* UBlueprintSubsystemManager::GetSubsystem(TSubclassOf<UBlueprintSubsystemBase> InClass)
 {
-	for (UBlueprintSubsystemBase* el : BlueprintSubsystems)
+	if (!InClass)
 	{
-		if (IsValid(el))
+		return nullptr;
+	}
+
+	for (UBlueprintSubsystemBase* subsystem : BlueprintSubsystems)
+	{
+		if (IsValid(subsystem) && subsystem->IsA(InClass.Get()))
 		{
-			if (el->GetClass() == InClass)
-			{
-				return el;
-			}
+			return subsystem;
 		}
 	}
 	return nullptr;
+}
+
+UBlueprintSubsystemBase* UBlueprintSubsystemManager::ActivateSubsystem(TSubclassOf<UBlueprintSubsystemBase> InClass)
+{
+	UClass* subsystemClass = InClass.Get();
+	if (!IsValid(subsystemClass) || subsystemClass->HasAnyClassFlags(CLASS_Abstract))
+	{
+		return nullptr;
+	}
+
+	if (UBlueprintSubsystemBase* existing = GetSubsystem(subsystemClass))
+	{
+		return existing;
+	}
+
+	UGameInstance* gameInstance = GetGameInstance();
+	if (!IsValid(gameInstance))
+	{
+		UE_LOG(LogBlueprintSubsystems, Warning, TEXT("Cannot activate %s without a valid GameInstance."), *subsystemClass->GetName());
+		return nullptr;
+	}
+
+	UBlueprintSubsystemBase* subsystem = NewObject<UBlueprintSubsystemBase>(this, subsystemClass);
+	if (!IsValid(subsystem) || !subsystem->ShouldCreateSubsystem(gameInstance))
+	{
+		UE_LOG(LogBlueprintSubsystems, Verbose, TEXT("Subsystem %s rejected creation."), *subsystemClass->GetName());
+		return nullptr;
+	}
+
+	BlueprintSubsystems.Add(subsystem);
+	if (!bIsInitializing)
+	{
+		subsystem->Initialize(BlueprintSubsystems);
+	}
+	return subsystem;
+}
+
+bool UBlueprintSubsystemManager::DeactivateSubsystem(TSubclassOf<UBlueprintSubsystemBase> InClass)
+{
+	UBlueprintSubsystemBase* subsystem = GetSubsystem(InClass.Get());
+	if (!IsValid(subsystem))
+	{
+		return false;
+	}
+
+	subsystem->DeInitialize();
+	BlueprintSubsystems.RemoveSingle(subsystem);
+	return true;
 }
