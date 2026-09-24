@@ -8,6 +8,7 @@
 
 class UGameInstance;
 class UWorld;
+class UBlueprintSubsystemManager;
 
 /**
  * @brief Base class for blueprint subsystems in Unreal Engine.
@@ -50,6 +51,10 @@ public:
 	 */
 	UFUNCTION(BlueprintNativeEvent, Category="BlueprintSubsystemBase")
 	void DeInitialize();
+
+	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemBase|Dependencies", meta=(DeterminesOutputType="SubsystemClass", DisplayName="Initialize Dependency", ToolTip="Activates and initializes a subsystem dependency before returning it."))
+	UBlueprintSubsystemBase* InitializeDependency(
+		TSubclassOf<UBlueprintSubsystemBase> SubsystemClass);
 
 	UFUNCTION(BlueprintNativeEvent, Category="BlueprintSubsystemBase")
 	bool ShouldCreateSubsystem(UGameInstance* InGameInstance) const;

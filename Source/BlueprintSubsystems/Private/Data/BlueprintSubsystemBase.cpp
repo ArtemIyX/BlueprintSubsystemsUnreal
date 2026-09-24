@@ -10,6 +10,18 @@ void UBlueprintSubsystemBase::DeInitialize_Implementation()
 {
 }
 
+UBlueprintSubsystemBase* UBlueprintSubsystemBase::InitializeDependency(
+	TSubclassOf<UBlueprintSubsystemBase> SubsystemClass)
+{
+	UBlueprintSubsystemManager* manager = GetTypedOuter<UBlueprintSubsystemManager>();
+	if (!IsValid(manager))
+	{
+		return nullptr;
+	}
+
+	return manager->InitializeDependency(this, SubsystemClass);
+}
+
 void UBlueprintSubsystemBase::Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList)
 {
 }

@@ -34,3 +34,100 @@ class UBlueprintSubsystemAbstractTestSubsystem : public UBlueprintSubsystemBase
 {
 	GENERATED_BODY()
 };
+
+UCLASS()
+class UBlueprintSubsystemDependencyLeafTestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	int32 InitializeCount = 0;
+	int32 DeInitializeCount = 0;
+	int32 InitializeOrder = 0;
+	int32 DeInitializeOrder = 0;
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+	virtual void DeInitialize_Implementation() override;
+};
+
+UCLASS()
+class UBlueprintSubsystemDependencyRequesterTestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TObjectPtr<UBlueprintSubsystemBase> Dependency;
+	int32 InitializeCount = 0;
+	int32 InitializeListCount = 0;
+	int32 InitializeOrder = 0;
+	int32 DeInitializeCount = 0;
+	int32 DeInitializeOrder = 0;
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+	virtual void DeInitialize_Implementation() override;
+};
+
+UCLASS()
+class UBlueprintSubsystemSecondRequesterTestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TObjectPtr<UBlueprintSubsystemBase> Dependency;
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+};
+
+UCLASS()
+class UBlueprintSubsystemDependencyMiddleTestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TObjectPtr<UBlueprintSubsystemBase> Dependency;
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+};
+
+UCLASS()
+class UBlueprintSubsystemDependencyRootTestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TObjectPtr<UBlueprintSubsystemBase> Dependency;
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+};
+
+UCLASS()
+class UBlueprintSubsystemDependencyRejectingRequesterTestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TObjectPtr<UBlueprintSubsystemBase> Dependency;
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+};
+
+UCLASS()
+class UBlueprintSubsystemDependencyCycleATestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+};
+
+UCLASS()
+class UBlueprintSubsystemDependencyCycleBTestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+};
