@@ -1,15 +1,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Subsystems/GameInstanceSubsystem.h"
+#include "Subsystems/WorldSubsystem.h"
 #include "Tickable.h"
-#include "BlueprintSubsystemManager.generated.h"
+#include "BlueprintWorldSubsystemManager.generated.h"
 
 class UBlueprintSubsystemManagerBase;
 class UBlueprintSubsystemBase;
 
 UCLASS(Blueprintable, BlueprintType)
-class BLUEPRINTSUBSYSTEMS_API UBlueprintSubsystemManager : public UGameInstanceSubsystem, public FTickableGameObject
+class BLUEPRINTSUBSYSTEMS_API UBlueprintWorldSubsystemManager : public UWorldSubsystem, public FTickableGameObject
 {
 	GENERATED_BODY()
 
@@ -17,16 +17,12 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
-	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemManager")
+	UFUNCTION(BlueprintCallable, Category="BlueprintWorldSubsystemManager")
 	UBlueprintSubsystemBase* GetSubsystem(TSubclassOf<UBlueprintSubsystemBase> InClass) const;
-	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemManager")
+	UFUNCTION(BlueprintCallable, Category="BlueprintWorldSubsystemManager")
 	UBlueprintSubsystemBase* ActivateSubsystem(TSubclassOf<UBlueprintSubsystemBase> InClass);
-	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemManager")
+	UFUNCTION(BlueprintCallable, Category="BlueprintWorldSubsystemManager")
 	bool DeactivateSubsystem(TSubclassOf<UBlueprintSubsystemBase> InClass);
-
-	UBlueprintSubsystemBase* InitializeDependency(
-		UBlueprintSubsystemBase* InRequester,
-		TSubclassOf<UBlueprintSubsystemBase> InClass);
 
 	UBlueprintSubsystemManagerBase* GetHost();
 	virtual void Tick(float DeltaSeconds) override;

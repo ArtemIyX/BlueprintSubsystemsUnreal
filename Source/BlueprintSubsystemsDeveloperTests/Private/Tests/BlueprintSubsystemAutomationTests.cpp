@@ -7,9 +7,12 @@
 #include "Libs/BlueprintSubsystemsLib.h"
 #include "Misc/AutomationTest.h"
 #include "Subsystems/BlueprintSubsystemManager.h"
+#include "Subsystems/BlueprintSubsystemManagerBase.h"
+#include "Subsystems/BlueprintWorldSubsystemManager.h"
 #include "BlueprintsSubsystemDeveloperSettings.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Engine/DeveloperSettings.h"
+#include "Engine/World.h"
 
 namespace
 {
@@ -18,6 +21,20 @@ namespace
 		OutGameInstance = NewObject<UGameInstance>(GetTransientPackage());
 		return NewObject<UBlueprintSubsystemManager>(OutGameInstance);
 	}
+
+	struct FWorldFixture
+	{
+		UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+		UBlueprintWorldSubsystemManager* Manager = World ? NewObject<UBlueprintWorldSubsystemManager>(World) : nullptr;
+
+		~FWorldFixture()
+		{
+			if (World)
+			{
+				World->DestroyWorld(false);
+			}
+		}
+	};
 
 	bool RunReflectionCase(FAutomationTestBase& Test, const int32 CaseId)
 	{
@@ -401,6 +418,141 @@ namespace
 		return true;
 	}
 
+	bool RunScopeAndTickCase(FAutomationTestBase& Test, const int32 CaseId)
+	{
+		UGameInstance* gameInstance = nullptr;
+		UBlueprintSubsystemManager* gameManager = CreateManager(gameInstance);
+		FWorldFixture worldFixture;
+
+		switch (CaseId)
+		{
+		case 147: Test.TestNotNull(TEXT("Shared manager host is reflected"), UBlueprintSubsystemManagerBase::StaticClass()); break;
+		case 148: Test.TestTrue(TEXT("World manager derives from UWorldSubsystem"), UBlueprintWorldSubsystemManager::StaticClass()->IsChildOf(UWorldSubsystem::StaticClass())); break;
+		case 149: Test.TestTrue(TEXT("World base derives from common base"), UBlueprintWorldSubsystemBase::StaticClass()->IsChildOf(UBlueprintSubsystemBase::StaticClass())); break;
+		case 150: Test.TestNotNull(TEXT("World fixture is created"), worldFixture.Manager); break;
+		case 151:
+		{
+			auto* subsystem = worldFixture.Manager ? Cast<UBlueprintWorldSubsystemTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass())) : nullptr;
+			Test.TestEqual(TEXT("World subsystem initializes once"), subsystem ? subsystem->InitializeCount : 0, 1);
+			break;
+		}
+		case 152:
+		{
+			worldFixture.Manager->ActivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass());
+			Test.TestNotNull(TEXT("World subsystem lookup works"), worldFixture.Manager->GetSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass()));
+			break;
+		}
+		case 153:
+		{
+			auto* subsystem = Cast<UBlueprintWorldSubsystemTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass()));
+			Test.TestTrue(TEXT("World subsystem deactivation succeeds"), worldFixture.Manager->DeactivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("World subsystem deinitializes once"), subsystem ? subsystem->DeInitializeCount : 0, 1);
+			break;
+		}
+		case 154: Test.TestNull(TEXT("World manager rejects GameInstance subsystem class"), worldFixture.Manager->ActivateSubsystem(UBlueprintSubsystemAcceptingTestSubsystem::StaticClass())); break;
+		case 155: Test.TestNull(TEXT("GameInstance manager rejects World subsystem class"), gameManager->ActivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass())); break;
+		case 156: Test.TestNotNull(TEXT("World settings property is reflected"), UBlueprintsSubsystemDeveloperSettings::StaticClass()->FindPropertyByName(TEXT("ActiveWorldSubsystems"))); break;
+		case 157: Test.TestNotNull(TEXT("World lookup function is reflected"), UBlueprintSubsystemsLib::StaticClass()->FindFunctionByName(TEXT("GetBlueprintWorldSubsystem"))); break;
+		case 158: Test.TestEqual(TEXT("World lookup output metadata is correct"), UBlueprintSubsystemsLib::StaticClass()->FindFunctionByName(TEXT("GetBlueprintWorldSubsystem"))->GetMetaData(TEXT("DeterminesOutputType")), FString(TEXT("SubsystemClass"))); break;
+		case 159: Test.TestNotNull(TEXT("Should Tick is reflected"), UBlueprintSubsystemBase::StaticClass()->FindFunctionByName(TEXT("ShouldTick"))); break;
+		case 160: Test.TestNotNull(TEXT("Tick is reflected"), UBlueprintSubsystemBase::StaticClass()->FindFunctionByName(TEXT("Tick"))); break;
+		case 161:
+		{
+			auto* subsystem = Cast<UBlueprintSubsystemTickingTestSubsystem>(gameManager->ActivateSubsystem(UBlueprintSubsystemTickingTestSubsystem::StaticClass()));
+			gameManager->Tick(0.25f);
+			Test.TestEqual(TEXT("GameInstance tick is disabled by default"), subsystem ? subsystem->TickCount : 0, 0);
+			break;
+		}
+		case 162:
+		{
+			auto* subsystem = Cast<UBlueprintSubsystemTickingTestSubsystem>(gameManager->ActivateSubsystem(UBlueprintSubsystemTickingTestSubsystem::StaticClass()));
+			subsystem->bShouldTick = true;
+			gameManager->Tick(0.25f);
+			Test.TestEqual(TEXT("Enabled GameInstance subsystem ticks"), subsystem->TickCount, 1);
+			break;
+		}
+		case 163:
+		{
+			auto* subsystem = Cast<UBlueprintSubsystemTickingTestSubsystem>(gameManager->ActivateSubsystem(UBlueprintSubsystemTickingTestSubsystem::StaticClass()));
+			subsystem->bShouldTick = true;
+			gameManager->Tick(0.25f);
+			subsystem->bShouldTick = false;
+			gameManager->Tick(0.5f);
+			Test.TestEqual(TEXT("Runtime Should Tick changes are respected"), subsystem->TickCount, 1);
+			break;
+		}
+		case 164:
+		{
+			auto* subsystem = Cast<UBlueprintSubsystemTickingTestSubsystem>(gameManager->ActivateSubsystem(UBlueprintSubsystemTickingTestSubsystem::StaticClass()));
+			subsystem->bShouldTick = true;
+			gameManager->Tick(0.75f);
+			Test.TestEqual(TEXT("GameInstance tick receives delta seconds"), subsystem->LastDeltaSeconds, 0.75f);
+			break;
+		}
+		case 165:
+		{
+			auto* subsystem = Cast<UBlueprintWorldTickingTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldTickingTestSubsystem::StaticClass()));
+			worldFixture.Manager->Tick(0.25f);
+			Test.TestEqual(TEXT("World tick is disabled by default"), subsystem ? subsystem->TickCount : 0, 0);
+			break;
+		}
+		case 166:
+		{
+			auto* subsystem = Cast<UBlueprintWorldTickingTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldTickingTestSubsystem::StaticClass()));
+			subsystem->bShouldTick = true;
+			worldFixture.Manager->Tick(0.25f);
+			Test.TestEqual(TEXT("Enabled World subsystem ticks"), subsystem->TickCount, 1);
+			break;
+		}
+		case 167:
+		{
+			auto* subsystem = Cast<UBlueprintWorldTickingTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldTickingTestSubsystem::StaticClass()));
+			subsystem->bShouldTick = true;
+			worldFixture.Manager->Tick(0.25f);
+			subsystem->bShouldTick = false;
+			worldFixture.Manager->Tick(0.5f);
+			Test.TestEqual(TEXT("World runtime Should Tick changes are respected"), subsystem->TickCount, 1);
+			break;
+		}
+		case 168:
+		{
+			auto* subsystem = Cast<UBlueprintWorldTickingTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldTickingTestSubsystem::StaticClass()));
+			subsystem->bShouldTick = true;
+			worldFixture.Manager->Tick(0.75f);
+			Test.TestEqual(TEXT("World tick receives delta seconds"), subsystem->LastDeltaSeconds, 0.75f);
+			break;
+		}
+		case 169:
+		{
+			FWorldFixture secondWorld;
+			auto* first = Cast<UBlueprintWorldSubsystemTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass()));
+			auto* second = Cast<UBlueprintWorldSubsystemTestSubsystem>(secondWorld.Manager->ActivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass()));
+			Test.TestTrue(TEXT("World subsystem instances are isolated per world"), first && second && first != second);
+			break;
+		}
+		case 170:
+		{
+			auto* subsystem = Cast<UBlueprintWorldSubsystemTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("World subsystem uses world manager outer"), subsystem ? subsystem->GetTypedOuter<UBlueprintWorldSubsystemManager>() : nullptr, worldFixture.Manager);
+			break;
+		}
+		case 171: Test.TestTrue(TEXT("GameInstance manager is tickable with a GameInstance"), gameManager->IsTickable()); break;
+		case 172: Test.TestTrue(TEXT("World manager is tickable with a World"), worldFixture.Manager->IsTickable()); break;
+		case 173: Test.TestTrue(TEXT("World manager has a valid host"), worldFixture.Manager->GetHost() != nullptr); break;
+		case 174: Test.TestTrue(TEXT("GameInstance manager has a valid host"), gameManager->GetHost() != nullptr); break;
+		case 175:
+		{
+			auto* subsystem = Cast<UBlueprintWorldSubsystemTestSubsystem>(worldFixture.Manager->ActivateSubsystem(UBlueprintWorldSubsystemTestSubsystem::StaticClass()));
+			worldFixture.Manager->Deinitialize();
+			Test.TestEqual(TEXT("World manager deinitializes owned subsystems"), subsystem ? subsystem->DeInitializeCount : 0, 1);
+			break;
+		}
+		default:
+			return false;
+		}
+		return true;
+	}
+
 	bool RunBlueprintSubsystemTestCase(FAutomationTestBase& Test, const int32 CaseId)
 	{
 		if (CaseId <= 20)
@@ -423,7 +575,11 @@ namespace
 		{
 			return RunLibraryCase(Test, CaseId);
 		}
-		return RunDependencyCase(Test, CaseId);
+		if (CaseId <= 146)
+		{
+			return RunDependencyCase(Test, CaseId);
+		}
+		return RunScopeAndTickCase(Test, CaseId);
 	}
 }
 
@@ -585,6 +741,35 @@ BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency143, "Blueprint
 BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency144, "BlueprintSubsystems.Dependency.RequestedClass", 144)
 BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency145, "BlueprintSubsystems.Dependency.RemovedRequester", 145)
 BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency146, "BlueprintSubsystems.Dependency.ManagerOuter", 146)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope147, "BlueprintSubsystems.Scope.SharedManager", 147)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope148, "BlueprintSubsystems.Scope.WorldManagerInheritance", 148)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope149, "BlueprintSubsystems.Scope.WorldBaseInheritance", 149)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope150, "BlueprintSubsystems.Scope.WorldCreation", 150)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope151, "BlueprintSubsystems.Scope.WorldInitialization", 151)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope152, "BlueprintSubsystems.Scope.WorldLookup", 152)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope153, "BlueprintSubsystems.Scope.WorldDeactivation", 153)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope154, "BlueprintSubsystems.Scope.WorldRejectsGameInstance", 154)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope155, "BlueprintSubsystems.Scope.GameInstanceRejectsWorld", 155)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope156, "BlueprintSubsystems.Scope.WorldSettings", 156)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope157, "BlueprintSubsystems.Scope.WorldLookupReflection", 157)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope158, "BlueprintSubsystems.Scope.WorldOutputMetadata", 158)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope159, "BlueprintSubsystems.Tick.ShouldTickReflection", 159)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope160, "BlueprintSubsystems.Tick.TickReflection", 160)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope161, "BlueprintSubsystems.Tick.GameInstanceDisabled", 161)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope162, "BlueprintSubsystems.Tick.GameInstanceEnabled", 162)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope163, "BlueprintSubsystems.Tick.GameInstanceRuntimeGate", 163)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope164, "BlueprintSubsystems.Tick.GameInstanceDelta", 164)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope165, "BlueprintSubsystems.Tick.WorldDisabled", 165)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope166, "BlueprintSubsystems.Tick.WorldEnabled", 166)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope167, "BlueprintSubsystems.Tick.WorldRuntimeGate", 167)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope168, "BlueprintSubsystems.Tick.WorldDelta", 168)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope169, "BlueprintSubsystems.Scope.WorldIsolation", 169)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope170, "BlueprintSubsystems.Scope.WorldOuter", 170)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope171, "BlueprintSubsystems.Tick.GameInstanceManager", 171)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope172, "BlueprintSubsystems.Tick.WorldManager", 172)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope173, "BlueprintSubsystems.Scope.WorldHost", 173)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope174, "BlueprintSubsystems.Scope.GameInstanceHost", 174)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemScope175, "BlueprintSubsystems.Scope.WorldCleanup", 175)
 
 #undef BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST
 

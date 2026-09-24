@@ -3,8 +3,30 @@
 
 #include "Data/BlueprintSubsystemBase.h"
 
+#include "Subsystems/BlueprintSubsystemManagerBase.h"
 #include "Subsystems/BlueprintSubsystemManager.h"
+#include "Subsystems/BlueprintWorldSubsystemManager.h"
 #include "Engine/GameInstance.h"
+
+namespace
+{
+	UBlueprintSubsystemManagerBase* FindManager(const UBlueprintSubsystemBase* InSubsystem)
+	{
+		if (UBlueprintSubsystemManagerBase* manager = InSubsystem->GetTypedOuter<UBlueprintSubsystemManagerBase>())
+		{
+			return manager;
+		}
+		if (const UBlueprintSubsystemManager* gameInstanceManager = InSubsystem->GetTypedOuter<UBlueprintSubsystemManager>())
+		{
+			return const_cast<UBlueprintSubsystemManager*>(gameInstanceManager)->GetHost();
+		}
+		if (const UBlueprintWorldSubsystemManager* worldManager = InSubsystem->GetTypedOuter<UBlueprintWorldSubsystemManager>())
+		{
+			return const_cast<UBlueprintWorldSubsystemManager*>(worldManager)->GetHost();
+		}
+		return nullptr;
+	}
+}
 
 void UBlueprintSubsystemBase::DeInitialize_Implementation()
 {
@@ -13,13 +35,24 @@ void UBlueprintSubsystemBase::DeInitialize_Implementation()
 UBlueprintSubsystemBase* UBlueprintSubsystemBase::InitializeDependency(
 	TSubclassOf<UBlueprintSubsystemBase> SubsystemClass)
 {
-	UBlueprintSubsystemManager* manager = GetTypedOuter<UBlueprintSubsystemManager>();
+	UBlueprintSubsystemManagerBase* manager = SubsystemManager ? SubsystemManager.Get() : FindManager(this);
 	if (!IsValid(manager))
 	{
 		return nullptr;
 	}
 
 	return manager->InitializeDependency(this, SubsystemClass);
+}
+
+UBlueprintSubsystemBase* UBlueprintSubsystemBase::InitializeDependencyInScope(
+	TSubclassOf<UBlueprintSubsystemBase> SubsystemClass,
+	EBlueprintSubsystemScope Scope)
+{
+	if (UBlueprintSubsystemManagerBase* manager = SubsystemManager ? SubsystemManager.Get() : FindManager(this))
+	{
+		return manager->InitializeDependency(this, SubsystemClass, Scope);
+	}
+	return nullptr;
 }
 
 void UBlueprintSubsystemBase::Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList)
@@ -37,7 +70,7 @@ UBlueprintSubsystemBase::UBlueprintSubsystemBase(const FObjectInitializer& Objec
 
 UGameInstance* UBlueprintSubsystemBase::GetGameInstance() const
 {
-	if (const UBlueprintSubsystemManager* manager = GetTypedOuter<UBlueprintSubsystemManager>())
+	if (const UBlueprintSubsystemManagerBase* manager = SubsystemManager ? SubsystemManager.Get() : FindManager(this))
 	{
 		return manager->GetGameInstance();
 	}
@@ -49,11 +82,25 @@ UWorld* UBlueprintSubsystemBase::GetWorldContext() const
 	return GetWorld();
 }
 
+bool UBlueprintSubsystemBase::ShouldTick_Implementation() const
+{
+	return false;
+}
+
+void UBlueprintSubsystemBase::Tick_Implementation(float DeltaSeconds)
+{
+}
+
 UWorld* UBlueprintSubsystemBase::GetWorld() const
 {
-	if (const UGameInstance* gameInstance = GetGameInstance())
+	if (const UBlueprintSubsystemManagerBase* manager = SubsystemManager ? SubsystemManager.Get() : FindManager(this))
 	{
-		return gameInstance->GetWorld();
+		return manager->GetWorldContext();
 	}
 	return nullptr;
+}
+
+void UBlueprintSubsystemBase::SetSubsystemManager(UBlueprintSubsystemManagerBase* InManager)
+{
+	SubsystemManager = InManager;
 }

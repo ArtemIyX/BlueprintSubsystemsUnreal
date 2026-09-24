@@ -33,4 +33,9 @@ public:
 	static UBlueprintSubsystemBase* GetBlueprintSubsystem(
 		const UObject* WorldContextObject,
 		TSubclassOf<UBlueprintSubsystemBase> SubsystemClass);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta=(WorldContext="WorldContextObject", DeterminesOutputType="SubsystemClass"), DisplayName="Get World Subsystem", Category="BlueprintSubsystemsLib")
+	static UBlueprintSubsystemBase* GetBlueprintWorldSubsystem(
+		const UObject* WorldContextObject,
+		TSubclassOf<UBlueprintSubsystemBase> SubsystemClass);
 };

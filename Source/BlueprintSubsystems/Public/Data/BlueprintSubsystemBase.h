@@ -3,12 +3,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/BlueprintSubsystemScope.h"
 #include "UObject/Object.h"
 #include "BlueprintSubsystemBase.generated.h"
 
 class UGameInstance;
 class UWorld;
-class UBlueprintSubsystemManager;
+class UBlueprintSubsystemManagerBase;
 
 /**
  * @brief Base class for blueprint subsystems in Unreal Engine.
@@ -56,6 +57,11 @@ public:
 	UBlueprintSubsystemBase* InitializeDependency(
 		TSubclassOf<UBlueprintSubsystemBase> SubsystemClass);
 
+	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemBase|Dependencies", meta=(DeterminesOutputType="SubsystemClass", DisplayName="Initialize Dependency In Scope", ToolTip="Activates and initializes a dependency in the selected subsystem scope."))
+	UBlueprintSubsystemBase* InitializeDependencyInScope(
+		TSubclassOf<UBlueprintSubsystemBase> SubsystemClass,
+		EBlueprintSubsystemScope Scope);
+
 	UFUNCTION(BlueprintNativeEvent, Category="BlueprintSubsystemBase")
 	bool ShouldCreateSubsystem(UGameInstance* InGameInstance) const;
 
@@ -72,5 +78,17 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="BlueprintSubsystemBase")
 	UWorld* GetWorldContext() const;
 
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category="BlueprintSubsystemBase|Tick", meta=(ToolTip="Returns whether this subsystem should receive a tick this frame."))
+	bool ShouldTick() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="BlueprintSubsystemBase|Tick", meta=(ToolTip="Runs once per frame when Should Tick returns true."))
+	void Tick(float DeltaSeconds);
+
 	virtual UWorld* GetWorld() const override;
+
+	void SetSubsystemManager(UBlueprintSubsystemManagerBase* InManager);
+
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<UBlueprintSubsystemManagerBase> SubsystemManager;
 };
