@@ -216,6 +216,191 @@ namespace
 		return true;
 	}
 
+	bool RunDependencyCase(FAutomationTestBase& Test, const int32 CaseId)
+	{
+		UGameInstance* gameInstance = nullptr;
+		UBlueprintSubsystemManager* manager = CreateManager(gameInstance);
+		Test.TestNotNull(TEXT("Dependency test manager exists"), manager);
+		if (!manager)
+		{
+			return false;
+		}
+
+		switch (CaseId)
+		{
+		case 121:
+		{
+			const UFunction* function = UBlueprintSubsystemBase::StaticClass()->FindFunctionByName(TEXT("InitializeDependency"));
+			Test.TestNotNull(TEXT("Initialize Dependency is reflected"), function);
+			break;
+		}
+		case 122:
+		{
+			const UFunction* function = UBlueprintSubsystemBase::StaticClass()->FindFunctionByName(TEXT("InitializeDependency"));
+			Test.TestTrue(TEXT("Initialize Dependency is Blueprint callable"), function && function->HasAnyFunctionFlags(FUNC_BlueprintCallable));
+			break;
+		}
+		case 123:
+		{
+			const UFunction* function = UBlueprintSubsystemBase::StaticClass()->FindFunctionByName(TEXT("InitializeDependency"));
+			Test.TestEqual(TEXT("Initialize Dependency determines output type"), function ? function->GetMetaData(TEXT("DeterminesOutputType")) : FString(), FString(TEXT("SubsystemClass")));
+			break;
+		}
+		case 124:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			Test.TestNotNull(TEXT("Requester activates with dependency"), requester);
+			Test.TestNotNull(TEXT("Dependency is returned to requester"), requester ? requester->Dependency.Get() : nullptr);
+			break;
+		}
+		case 125:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			auto* dependency = Cast<UBlueprintSubsystemDependencyLeafTestSubsystem>(manager->GetSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			Test.TestTrue(TEXT("Dependency initializes before requester"), dependency && requester && dependency->InitializeOrder < requester->InitializeOrder);
+			break;
+		}
+		case 126:
+		{
+			manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass());
+			auto* second = Cast<UBlueprintSubsystemSecondRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemSecondRequesterTestSubsystem::StaticClass()));
+			Test.TestNotNull(TEXT("Shared dependency is retained once"), manager->GetSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("Both requesters share the dependency"), second ? second->Dependency.Get() : nullptr, manager->GetSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			break;
+		}
+		case 127:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("Dependency can be activated on demand"), requester ? requester->Dependency.Get() : nullptr, manager->GetSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			break;
+		}
+		case 128:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			UBlueprintSubsystemBase* dependency = requester ? requester->InitializeDependency(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()) : nullptr;
+			auto* leaf = Cast<UBlueprintSubsystemDependencyLeafTestSubsystem>(dependency);
+			Test.TestTrue(TEXT("Repeated dependency request returns the same object"), leaf == manager->GetSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("Repeated dependency request does not reinitialize"), leaf ? leaf->InitializeCount : 0, 1);
+			break;
+		}
+		case 129:
+		{
+			Test.TestNull(TEXT("Null dependency class is rejected"), manager->InitializeDependency(nullptr, nullptr));
+			break;
+		}
+		case 130:
+		{
+			Test.TestNull(TEXT("Abstract dependency is rejected"), manager->ActivateSubsystem(UBlueprintSubsystemAbstractTestSubsystem::StaticClass()));
+			break;
+		}
+		case 131:
+		{
+			auto* dependency = manager->ActivateSubsystem(UBlueprintSubsystemRejectingTestSubsystem::StaticClass());
+			Test.TestNull(TEXT("Rejected dependency is not activated"), dependency);
+			break;
+		}
+		case 132:
+		{
+			Test.TestNull(TEXT("Cycle activation fails"), manager->ActivateSubsystem(UBlueprintSubsystemDependencyCycleATestSubsystem::StaticClass()));
+			break;
+		}
+		case 133:
+		{
+			manager->ActivateSubsystem(UBlueprintSubsystemDependencyCycleATestSubsystem::StaticClass());
+			Test.TestNull(TEXT("Indirect dependency cycle leaves no active cycle member"), manager->GetSubsystem(UBlueprintSubsystemDependencyCycleBTestSubsystem::StaticClass()));
+			break;
+		}
+		case 134:
+		{
+			manager->ActivateSubsystem(UBlueprintSubsystemAcceptingTestSubsystem::StaticClass());
+			manager->ActivateSubsystem(UBlueprintSubsystemDependencyRejectingRequesterTestSubsystem::StaticClass());
+			Test.TestNotNull(TEXT("Unrelated subsystem survives dependency failure"), manager->GetSubsystem(UBlueprintSubsystemAcceptingTestSubsystem::StaticClass()));
+			break;
+		}
+		case 135:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRootTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRootTestSubsystem::StaticClass()));
+			auto* middle = Cast<UBlueprintSubsystemDependencyMiddleTestSubsystem>(manager->GetSubsystem(UBlueprintSubsystemDependencyMiddleTestSubsystem::StaticClass()));
+			auto* leaf = Cast<UBlueprintSubsystemDependencyLeafTestSubsystem>(manager->GetSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			Test.TestTrue(TEXT("Transitive dependency chain initializes"), requester && middle && leaf && requester->Dependency.Get() == middle && middle->Dependency.Get() == leaf);
+			break;
+		}
+		case 136:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("Initialization receives the active collection"), requester ? requester->InitializeListCount : 0, 1);
+			break;
+		}
+		case 137:
+		{
+			manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass());
+			Test.TestFalse(TEXT("Direct dependency deactivation is blocked"), manager->DeactivateSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			break;
+		}
+		case 138:
+		{
+			manager->ActivateSubsystem(UBlueprintSubsystemDependencyRootTestSubsystem::StaticClass());
+			Test.TestFalse(TEXT("Transitive dependency deactivation is blocked"), manager->DeactivateSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			break;
+		}
+		case 139:
+		{
+			manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass());
+			manager->DeactivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass());
+			Test.TestTrue(TEXT("Dependency deactivation succeeds after dependent removal"), manager->DeactivateSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			break;
+		}
+		case 140:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			auto* leaf = Cast<UBlueprintSubsystemDependencyLeafTestSubsystem>(manager->GetSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			manager->Deinitialize();
+			Test.TestTrue(TEXT("Cleanup runs in reverse initialization order"), requester && leaf && requester->DeInitializeOrder < leaf->DeInitializeOrder);
+			break;
+		}
+		case 141:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("Requester initializes once"), requester ? requester->InitializeCount : 0, 1);
+			break;
+		}
+		case 142:
+		{
+			auto* leaf = Cast<UBlueprintSubsystemDependencyLeafTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("Standalone runtime activation initializes once"), leaf ? leaf->InitializeCount : 0, 1);
+			break;
+		}
+		case 143:
+		{
+			manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass());
+			Test.TestTrue(TEXT("Managed dependency remains GC referenced"), IsValid(manager->GetSubsystem(UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass())));
+			break;
+		}
+		case 144:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("Dependency lookup uses the requested class"), requester && requester->Dependency ? requester->Dependency->GetClass() : nullptr, UBlueprintSubsystemDependencyLeafTestSubsystem::StaticClass());
+			break;
+		}
+		case 145:
+		{
+			manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass());
+			manager->DeactivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass());
+			Test.TestNull(TEXT("Removed requester no longer blocks dependency removal"), manager->GetSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			break;
+		}
+		case 146:
+		{
+			auto* requester = Cast<UBlueprintSubsystemDependencyRequesterTestSubsystem>(manager->ActivateSubsystem(UBlueprintSubsystemDependencyRequesterTestSubsystem::StaticClass()));
+			Test.TestEqual(TEXT("Requester stores the manager dependency instance"), requester && requester->Dependency ? requester->Dependency->GetTypedOuter<UBlueprintSubsystemManager>() : nullptr, manager);
+			break;
+		}
+		default:
+			return false;
+		}
+		return true;
+	}
+
 	bool RunBlueprintSubsystemTestCase(FAutomationTestBase& Test, const int32 CaseId)
 	{
 		if (CaseId <= 20)
@@ -234,7 +419,11 @@ namespace
 		{
 			return RunRuntimeCase(Test, CaseId);
 		}
-		return RunLibraryCase(Test, CaseId);
+		if (CaseId <= 120)
+		{
+			return RunLibraryCase(Test, CaseId);
+		}
+		return RunDependencyCase(Test, CaseId);
 	}
 }
 
@@ -369,6 +558,33 @@ BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemLibrary117, "BlueprintSub
 BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemLibrary118, "BlueprintSubsystems.Library.BlueprintType", 118)
 BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemLibrary119, "BlueprintSubsystems.Library.ManagerValidity", 119)
 BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemLibrary120, "BlueprintSubsystems.Library.GameInstanceValidity", 120)
+
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency121, "BlueprintSubsystems.Dependency.Reflection", 121)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency122, "BlueprintSubsystems.Dependency.BlueprintCallable", 122)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency123, "BlueprintSubsystems.Dependency.OutputMetadata", 123)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency124, "BlueprintSubsystems.Dependency.Activation", 124)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency125, "BlueprintSubsystems.Dependency.Order", 125)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency126, "BlueprintSubsystems.Dependency.Shared", 126)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency127, "BlueprintSubsystems.Dependency.OnDemand", 127)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency128, "BlueprintSubsystems.Dependency.Reuse", 128)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency129, "BlueprintSubsystems.Dependency.Null", 129)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency130, "BlueprintSubsystems.Dependency.Abstract", 130)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency131, "BlueprintSubsystems.Dependency.Rejected", 131)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency132, "BlueprintSubsystems.Dependency.Cycle", 132)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency133, "BlueprintSubsystems.Dependency.CycleCleanup", 133)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency134, "BlueprintSubsystems.Dependency.Isolation", 134)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency135, "BlueprintSubsystems.Dependency.Transitive", 135)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency136, "BlueprintSubsystems.Dependency.Collection", 136)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency137, "BlueprintSubsystems.Dependency.BlockDirectRemoval", 137)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency138, "BlueprintSubsystems.Dependency.BlockTransitiveRemoval", 138)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency139, "BlueprintSubsystems.Dependency.RemoveAfterDependent", 139)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency140, "BlueprintSubsystems.Dependency.ReverseCleanup", 140)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency141, "BlueprintSubsystems.Dependency.SingleInitialization", 141)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency142, "BlueprintSubsystems.Dependency.RuntimeActivation", 142)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency143, "BlueprintSubsystems.Dependency.GCReference", 143)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency144, "BlueprintSubsystems.Dependency.RequestedClass", 144)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency145, "BlueprintSubsystems.Dependency.RemovedRequester", 145)
+BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST(FBlueprintSubsystemDependency146, "BlueprintSubsystems.Dependency.ManagerOuter", 146)
 
 #undef BLUEPRINT_SUBSYSTEM_AUTOMATION_TEST
 

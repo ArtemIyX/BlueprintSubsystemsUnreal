@@ -34,8 +34,8 @@ protected:
 	* @brief Array of blueprint subsystems managed by this manager.
 	* @see UBlueprintsSubsystemDeveloperSettings
 	*/
-	UPROPERTY(BlueprintReadOnly, Category = "Details")
-	TArray<UBlueprintSubsystemBase*> BlueprintSubsystems;
+	UPROPERTY(BlueprintReadOnly, Category = "Details", meta = (ToolTip = "All Blueprint subsystems currently owned by this manager."))
+	TArray<TObjectPtr<UBlueprintSubsystemBase>> BlueprintSubsystems;
 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -60,6 +60,10 @@ public:
 	UBlueprintSubsystemBase* GetSubsystem(
 		TSubclassOf<UBlueprintSubsystemBase> InClass);
 
+	UBlueprintSubsystemBase* InitializeDependency(
+		UBlueprintSubsystemBase* InRequester,
+		TSubclassOf<UBlueprintSubsystemBase> InClass);
+
 	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemManager")
 	UBlueprintSubsystemBase* ActivateSubsystem(
 		TSubclassOf<UBlueprintSubsystemBase> InClass);
@@ -68,6 +72,18 @@ public:
 	bool DeactivateSubsystem(
 		TSubclassOf<UBlueprintSubsystemBase> InClass);
 
-	private:
+private:
+	UBlueprintSubsystemBase* CreateSubsystem(TSubclassOf<UBlueprintSubsystemBase> InClass);
+	bool InitializeSubsystem(UBlueprintSubsystemBase* InSubsystem);
+	bool HasActiveDependents(const UBlueprintSubsystemBase* InSubsystem) const;
+	bool DependsOn(const UBlueprintSubsystemBase* InSubsystem,
+		const UBlueprintSubsystemBase* InTarget,
+		TSet<const UBlueprintSubsystemBase*>& InVisited) const;
+	void RemoveSubsystemState(UBlueprintSubsystemBase* InSubsystem);
+
+	TMap<TWeakObjectPtr<UBlueprintSubsystemBase>, uint8> InitializationStates;
+	TMap<TWeakObjectPtr<UBlueprintSubsystemBase>, TSet<TWeakObjectPtr<UBlueprintSubsystemBase>>> DependencyGraph;
+	TArray<TWeakObjectPtr<UBlueprintSubsystemBase>> InitializationOrder;
+	TSet<TWeakObjectPtr<UBlueprintSubsystemBase>> FailedSubsystems;
 	bool bIsInitializing = false;
 };
