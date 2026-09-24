@@ -4,19 +4,22 @@
 #include "Libs/BlueprintSubsystemsLib.h"
 
 #include "Subsystems/BlueprintSubsystemManager.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 
 
-UBlueprintSubsystemBase* UBlueprintSubsystemsLib::GetBlueprintSubsystem(UGameInstance* InGameInstance,
+UBlueprintSubsystemBase* UBlueprintSubsystemsLib::GetBlueprintSubsystem(const UObject* WorldContextObject,
                                                                         TSubclassOf<UBlueprintSubsystemBase>
                                                                         SubsystemClass)
 {
-	if (!IsValid(InGameInstance))
+	if (!IsValid(WorldContextObject) || !SubsystemClass || !GEngine)
 		return nullptr;
 
-	if (!SubsystemClass)
+	UWorld* world = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+	if (!IsValid(world) || !IsValid(world->GetGameInstance()))
 		return nullptr;
-	
-	UBlueprintSubsystemManager* manager = InGameInstance->GetSubsystem<UBlueprintSubsystemManager>();
+
+	UBlueprintSubsystemManager* manager = world->GetGameInstance()->GetSubsystem<UBlueprintSubsystemManager>();
 	if (!IsValid(manager))
 		return nullptr;
 

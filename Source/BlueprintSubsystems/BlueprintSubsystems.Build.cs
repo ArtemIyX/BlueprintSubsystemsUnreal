@@ -26,7 +26,9 @@ public class BlueprintSubsystems : ModuleRules
 			new string[]
 			{
 				"Core",
-				// ... add other public dependencies that you statically link with here ...
+				"CoreUObject",
+				"Engine",
+				"DeveloperSettings"
 			}
 			);
 			
@@ -34,12 +36,7 @@ public class BlueprintSubsystems : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"CoreUObject",
-				"Engine",
-				"Slate",
-				"SlateCore",
-				"DeveloperSettings"
-				// ... add private dependencies that you statically link with here ...	
+				"UMG"
 			}
 			);
 		

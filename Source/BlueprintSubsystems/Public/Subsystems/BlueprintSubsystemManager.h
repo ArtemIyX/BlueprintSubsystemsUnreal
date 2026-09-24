@@ -37,7 +37,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Details")
 	TArray<UBlueprintSubsystemBase*> BlueprintSubsystems;
 
-protected:
+public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
@@ -59,4 +59,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemManager")
 	UBlueprintSubsystemBase* GetSubsystem(
 		TSubclassOf<UBlueprintSubsystemBase> InClass);
+
+	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemManager")
+	UBlueprintSubsystemBase* ActivateSubsystem(
+		TSubclassOf<UBlueprintSubsystemBase> InClass);
+
+	UFUNCTION(BlueprintCallable, Category="BlueprintSubsystemManager")
+	bool DeactivateSubsystem(
+		TSubclassOf<UBlueprintSubsystemBase> InClass);
+
+	private:
+	bool bIsInitializing = false;
 };
