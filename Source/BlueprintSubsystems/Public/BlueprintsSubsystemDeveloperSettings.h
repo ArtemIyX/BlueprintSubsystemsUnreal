@@ -7,6 +7,7 @@
 #include "BlueprintsSubsystemDeveloperSettings.generated.h"
 
 class UBlueprintSubsystemBase;
+class UBlueprintWorldSubsystemBase;
 /**
  * @class UBlueprintsSubsystemDeveloperSettings
  * @brief Developer settings for managing blueprint subsystems.
@@ -40,4 +41,7 @@ public:
 	*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Config, DisplayName="Subsystem List", Category = "Details")
 	TArray<TSoftClassPtr<UBlueprintSubsystemBase>> ActiveSubsystems;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Config, DisplayName="World Subsystem List", Category = "Details", meta=(ToolTip="Blueprint subsystems created once for each World."))
+	TArray<TSoftClassPtr<UBlueprintWorldSubsystemBase>> ActiveWorldSubsystems;
 };

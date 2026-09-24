@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Data/BlueprintSubsystemBase.h"
+#include "Data/BlueprintWorldSubsystemBase.h"
 #include "BlueprintSubsystemTestTypes.generated.h"
 
 UCLASS()
@@ -130,4 +131,45 @@ class UBlueprintSubsystemDependencyCycleBTestSubsystem : public UBlueprintSubsys
 	GENERATED_BODY()
 
 	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+};
+
+UCLASS()
+class UBlueprintSubsystemTickingTestSubsystem : public UBlueprintSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	bool bShouldTick = false;
+	int32 TickCount = 0;
+	float LastDeltaSeconds = 0.0f;
+
+	virtual bool ShouldTick_Implementation() const override;
+	virtual void Tick_Implementation(float DeltaSeconds) override;
+};
+
+UCLASS()
+class UBlueprintWorldSubsystemTestSubsystem : public UBlueprintWorldSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	int32 InitializeCount = 0;
+	int32 DeInitializeCount = 0;
+
+	virtual void Initialize_Implementation(const TArray<UBlueprintSubsystemBase*>& InSubsystemList) override;
+	virtual void DeInitialize_Implementation() override;
+};
+
+UCLASS()
+class UBlueprintWorldTickingTestSubsystem : public UBlueprintWorldSubsystemBase
+{
+	GENERATED_BODY()
+
+public:
+	bool bShouldTick = false;
+	int32 TickCount = 0;
+	float LastDeltaSeconds = 0.0f;
+
+	virtual bool ShouldTick_Implementation() const override;
+	virtual void Tick_Implementation(float DeltaSeconds) override;
 };

@@ -92,3 +92,36 @@ void UBlueprintSubsystemDependencyCycleBTestSubsystem::Initialize_Implementation
 {
 	InitializeDependency(UBlueprintSubsystemDependencyCycleATestSubsystem::StaticClass());
 }
+
+bool UBlueprintSubsystemTickingTestSubsystem::ShouldTick_Implementation() const
+{
+	return bShouldTick;
+}
+
+void UBlueprintSubsystemTickingTestSubsystem::Tick_Implementation(float DeltaSeconds)
+{
+	++TickCount;
+	LastDeltaSeconds = DeltaSeconds;
+}
+
+void UBlueprintWorldSubsystemTestSubsystem::Initialize_Implementation(
+	const TArray<UBlueprintSubsystemBase*>& InSubsystemList)
+{
+	++InitializeCount;
+}
+
+void UBlueprintWorldSubsystemTestSubsystem::DeInitialize_Implementation()
+{
+	++DeInitializeCount;
+}
+
+bool UBlueprintWorldTickingTestSubsystem::ShouldTick_Implementation() const
+{
+	return bShouldTick;
+}
+
+void UBlueprintWorldTickingTestSubsystem::Tick_Implementation(float DeltaSeconds)
+{
+	++TickCount;
+	LastDeltaSeconds = DeltaSeconds;
+}

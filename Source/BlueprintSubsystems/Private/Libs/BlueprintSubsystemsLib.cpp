@@ -4,6 +4,7 @@
 #include "Libs/BlueprintSubsystemsLib.h"
 
 #include "Subsystems/BlueprintSubsystemManager.h"
+#include "Subsystems/BlueprintWorldSubsystemManager.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 
@@ -24,4 +25,22 @@ UBlueprintSubsystemBase* UBlueprintSubsystemsLib::GetBlueprintSubsystem(const UO
 		return nullptr;
 
 	return manager->GetSubsystem(SubsystemClass);
+}
+
+UBlueprintSubsystemBase* UBlueprintSubsystemsLib::GetBlueprintWorldSubsystem(
+	const UObject* WorldContextObject,
+	TSubclassOf<UBlueprintSubsystemBase> SubsystemClass)
+{
+	if (!IsValid(WorldContextObject) || !SubsystemClass || !GEngine)
+	{
+		return nullptr;
+	}
+
+	UWorld* world = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+	if (!IsValid(world))
+	{
+		return nullptr;
+	}
+	UBlueprintWorldSubsystemManager* manager = world->GetSubsystem<UBlueprintWorldSubsystemManager>();
+	return IsValid(manager) ? manager->GetSubsystem(SubsystemClass) : nullptr;
 }
